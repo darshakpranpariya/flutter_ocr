@@ -19,7 +19,7 @@ class _Text_RecoState extends State<Text_Reco> {
   int angle = 90; //rotation of image, every time.
   DateTime birthDate; //will store birth-date.
   String userId, username; //will store userId and userName.
-  String nationality;
+  String nationality; //will store nationality of the person.
   // bool flagForNationality=true;
   // String flagStringForNationality = "";
 
@@ -57,7 +57,7 @@ class _Text_RecoState extends State<Text_Reco> {
             SizedBox(
               height: 100.0,
             ),
-            birthDate != null && userId != null
+            birthDate != null && userId != null && username!=null && nationality!=""
                 ? Text(birthDate.toString() +
                     '\n' +
                     userId +
@@ -108,10 +108,9 @@ class _Text_RecoState extends State<Text_Reco> {
     setState(() {
       pickedImage = tempStore;
       isImageLoaded = true;
-      s = "";
+      s = ""; //will store every extracted word from image.
       defaultText = "BirthDate will be printed here..."; //set defaultText.
       birthDate = null;
-      // nationality=null;
     });
     // findBirthDate();
   }
@@ -123,7 +122,7 @@ class _Text_RecoState extends State<Text_Reco> {
   void findBirthDate() async {
     //Number of rotaion for image.
     int counter = 0;
-    // int currentTimeStamp = DateTime.now().second;
+
     while (falgForStopingFindBirthDateFunction == true) {
       //Logic to stop rotation after 14 seconds..NOT GOOD WAY.
       // if(DateTime.now().second-currentTimeStamp>14){
@@ -140,12 +139,13 @@ class _Text_RecoState extends State<Text_Reco> {
       //for updating birthdate on UI.
       setState(() {});
 
-      print(birthDate);
+      print(birthDate); //for debug.
 
-      if (birthDate == null && counter <= 3) {
-        counter += 1;
+
+      if (birthDate == null && counter <= 3 && falgForStopingFindBirthDateFunction==true) {
+        counter += 1; //for every rotation.
         if(angle==180){
-          counter += 1;
+          counter += 1; //for skipping one rotation if angle is 180, so increment counter by 1.
         }
 
         //four line for rotaion of image.
@@ -156,7 +156,7 @@ class _Text_RecoState extends State<Text_Reco> {
             await pickedImage.writeAsBytes(img.encodeJpg(originalImage));
 
         setState(() {
-          pickedImage = pickedImage;
+          pickedImage = pickedImage; //replace original image with rotated image.
           isImageLoaded = true;
         });
       } else {
@@ -165,11 +165,11 @@ class _Text_RecoState extends State<Text_Reco> {
       }
     }
 
-    if (counter > 3) defaultText = "upload photo once again..";
+    if (counter > 3) defaultText = "upload photo once again,image is not clear.";
     //for updating defaultText on UI.
     setState(() {});
 
-    //BackTracking.
+    //BackTracking for new image.
     falgForStopingFindBirthDateFunction = true;
     print('Birth Date is :${birthDate.toString()}');
   }
@@ -180,22 +180,25 @@ class _Text_RecoState extends State<Text_Reco> {
     //nationality => store nationality of person from document
     //getNationalityTag => will fetch Nationality tag from image.
     String name = "", getNameTag = "", nationality = "", getNationalityTag = "";
-
+    DateTime bd; //will store birthdate temperorily.
+    bool flagForFinishingBirthDate = false;// as name suggest.
     bool flagForFinishingUserName = true; //as name suggest.
     bool flagForFinishingNationality = true; //as name suggest.
 
-    List<DateTime> listOfDate = []; //will store list of date.
+    // List<DateTime> listOfDate = []; //will store list of date.
 
     FirebaseVisionImage ourImage = FirebaseVisionImage.fromFile(pickedImage);
     TextRecognizer recognizeText = FirebaseVision.instance.textRecognizer();
-    // print("Start Time ${DateTime.now()}");
-    VisionText rt = await recognizeText.processImage(ourImage);
-    // print("End Time ${DateTime.now()}");
+    VisionText rt = await recognizeText.processImage(ourImage); //will store
+    // total ocr extracted text.
+    
     if (rt.text == "") {
-      angle = 90;
+      angle = 90; //bcz, this time image might be verticale so rt="" and we
+      // have to rotate it 90 degree in order to convert image into horizonatal.
       return null;
     } else {
-      angle = 180;
+      angle = 180; //here, image would be horizonatal, but we don't know its undhi or chitti
+      // so angle would be 180.
       setState(() {
         s = "";
         for (TextBlock block in rt.blocks) {
@@ -208,17 +211,37 @@ class _Text_RecoState extends State<Text_Reco> {
               }
             }
 
+            // for finding birth date from extracted line of word.
             if (birthDate == null) {
               var tempDate = matchRegXForDOB1(line);
-              if (tempDate != null &&
-                  tempDate.year >= 1950 &&
-                  tempDate.year <= DateTime.now().year - 20)
-                listOfDate.add(tempDate);
-              else {
-                //ocr not able to captured DOB then it will stop rotation of image.
-                falgForStopingFindBirthDateFunction = false;
-                defaultText = "upload photo once again";
+              if (tempDate != null){
+
+                //if, for validating birthdate.
+                if(tempDate.year >= 1950 &&
+                  tempDate.year <= DateTime.now().year - 18){
+                    bd=tempDate;
+                    flagForFinishingBirthDate=false;
+                  }
+                else{
+                  if(bd==null)
+                    flagForFinishingBirthDate=true;
+                }
+                  // listOfDate.add(tempDate);
+                  
+                // else{
+                //   if(listOfDate.isEmpty){
+                //     //showToast
+                //     print("you are not eligible");
+                //     falgForStopingFindBirthDateFunction = false;
+                //   }
+                // }
               }
+                  
+              // else {
+              //   //ocr not able to captured DOB then it will stop rotation of image.
+              //   falgForStopingFindBirthDateFunction = false;
+              //   defaultText = "upload photo once again";
+              // }
             }
 
             // line.elements.forEach((element) {
@@ -233,13 +256,18 @@ class _Text_RecoState extends State<Text_Reco> {
               if (getNameTag == "") {
                 getNameTag = matchRegXForUserName(word.text);
               } else {
-                if (word.text[0] == 'N' &&
+                try{
+                  if (word.text[0] == 'N' &&
                     word.text[1] == 'A' &&
                     word.text[2] == 'T') {
-                  flagForFinishingUserName = false;
+                    flagForFinishingUserName = false;
+                  }
+                  if (flagForFinishingUserName) {
+                    name += (word.text) + " ";
+                  }
                 }
-                if (flagForFinishingUserName) {
-                  name += (word.text) + " ";
+                catch(E){
+                  print(E);
                 }
               }
 
@@ -302,15 +330,28 @@ class _Text_RecoState extends State<Text_Reco> {
       });
 
       this.username = name; //transfer whole username to global variable.
-      this.nationality = nationality;
+      this.nationality = nationality; // transfer whole nationality to this.nationality.
 
-      if (listOfDate.isNotEmpty)
-        return findOlderDate(listOfDate);
-      else {
+      if(bd==null && flagForFinishingBirthDate==false){
         falgForStopingFindBirthDateFunction = true;
-        defaultText="";
         return null;
       }
+      else if(flagForFinishingBirthDate==true){
+        //showToast on UI that user is not eligible bcz his age is less than 18.
+        print("you are not eligible.");
+        falgForStopingFindBirthDateFunction = false;
+        return null;
+      }
+      else{
+        return bd;
+      }
+      // if (listOfDate.isNotEmpty)
+      //   return findOlderDate(listOfDate);
+      // else {
+      //   falgForStopingFindBirthDateFunction = true;
+      //   defaultText="";
+      //   return null;
+      // }
     }
   }
 
@@ -334,13 +375,8 @@ class _Text_RecoState extends State<Text_Reco> {
   }
 
   String matchRegxForNationality2(String nationalityStringLine) {
-    // String nationalityStringLine=flagStringForNationality;
-    // for(TextElement te in nationality){
-    //   nationalityStringLine+=(te.text);
-    // }
-    print(nationalityStringLine);
 
-    //remove white space from left and right side of the word.
+    print(nationalityStringLine);
 
     //for residency permit of quatar.
     if (nationalityStringLine
@@ -453,21 +489,21 @@ class _Text_RecoState extends State<Text_Reco> {
   }
 
   //will find older date(Birth Date) from the list of date.
-  DateTime findOlderDate(List<DateTime> listOfDate) {
-    DateTime birthDate;
-    int diff = 0;
-    DateTime currentDate = DateTime.now();
-    listOfDate.forEach((element) {
-      int currentDiff = currentDate.difference(element).inDays;
-      if (currentDiff > 0) {
-        if (currentDiff > diff) {
-          birthDate = element;
-          diff = currentDiff;
-        }
-      }
-    });
-    return birthDate;
-  }
+  // DateTime findOlderDate(List<DateTime> listOfDate) {
+  //   DateTime birthDate;
+  //   int diff = 0;
+  //   DateTime currentDate = DateTime.now();
+  //   listOfDate.forEach((element) {
+  //     int currentDiff = currentDate.difference(element).inDays;
+  //     if (currentDiff > 0) {
+  //       if (currentDiff > diff) {
+  //         birthDate = element;
+  //         diff = currentDiff;
+  //       }
+  //     }
+  //   });
+  //   return birthDate;
+  // }
 
   //Second logic to find date from the ocr text.
   // void extractDate(String text) {
